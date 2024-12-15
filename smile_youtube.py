@@ -5,6 +5,9 @@ import re
 import os
 import requests
 import argparse
+import sys
+
+sys.stdout.reconfigure(encoding='utf-8')
 
 class CustomArgumentParser(argparse.ArgumentParser):
     def error(self, message):
@@ -12,7 +15,7 @@ class CustomArgumentParser(argparse.ArgumentParser):
         print(f"\nHata: {message}")  # Hatanın nedenini belirt
         exit(2)  # Programı hata kodu ile sonlandır
 
-parser = CustomArgumentParser(description="Youtube Playlist Downloader")
+parser = CustomArgumentParser(description="Youtube Playlist Downloader",add_help=True)
 parser.add_argument("--klasor", type=str, default="./Podcasts", help="İndirilecek dosyaların kaydedileceği klasör yolunu belirtin.")
 args = parser.parse_args()
 klasor_name=args.klasor
