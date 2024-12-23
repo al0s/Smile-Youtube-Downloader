@@ -69,10 +69,10 @@ def remove_accent(name):
 #gereksiz karakterleri silip, sapkalari kaldiriyor ve kelimelerin ilk harflerini buyuk yapiyor.
 def format_name(name):
     #print(f"[DEBUG] format_name (lower öncesi): {name}")
-    name=name.replace(" l "," ")
+    name=name.replace(" l "," | ")
     name = remove_accent(name)
     #print(f"[DEBUG] format_name (accent sonrası): {name}") 
-    name = re.sub(r'[\/\'#!$%^.*?;:{}=_`~<>\-\|\\]', '', name)
+    name = re.sub(r'[\/\'#!$%^.*?;:{}=_`~<>\\]', '', name)
     #print(f"[DEBUG] format_name (resub sonrası): {name}") 
     name_lower = Alower(name)  # Lower işlemi
     #print(f"[DEBUG] format_name (lower sonrası): {name_lower}")
@@ -99,8 +99,8 @@ subprocess.run(
             ])
 
 # Playlist bilgilerini işleyip indir
-def process_and_download_playlist(playlist_url):
-    print(f"[INFO] Playlist bilgileri işleniyor: {playlist_url}")
+def process_and_download_playlist(playlist_url, kategori):
+    print(f"[INFO] Playlist bilgileri işleniyor: {playlist_url} (Kategori: {kategori})")
     try:
         # Playlist'teki her videoyu indir
         result = subprocess.run(
@@ -134,20 +134,23 @@ def process_and_download_playlist(playlist_url):
             return
 
         # Dosya ismini ve dizini ayarla
-        dizin = f"{klasor_name}/YT - {playlist_title}/"
+        dizin = f"{klasor_name}/{kategori} - {playlist_title}/"
         os.makedirs(dizin, exist_ok=True)
         thumbnail_file = os.path.join(dizin, f"cover.jpg")
 
         # Thumbnail dosyasını indir
-        print(f"[INFO] Thumbnail indiriliyor: {thumbnail_url}")
-        response = requests.get(thumbnail_url, stream=True)
-        if response.status_code == 200:
-            with open(thumbnail_file, "wb") as file:
-                for chunk in response.iter_content(1024):
-                    file.write(chunk)
-            print(f"[INFO] Thumbnail başarıyla indirildi: {thumbnail_file}")
+        if not os.path.exists(thumbnail_file):
+            print(f"[INFO] Thumbnail indiriliyor: {thumbnail_url}")
+            response = requests.get(thumbnail_url, stream=True)
+            if response.status_code == 200:
+                with open(thumbnail_file, "wb") as file:
+                    for chunk in response.iter_content(1024):
+                        file.write(chunk)
+                print(f"[INFO] Thumbnail başarıyla indirildi: {thumbnail_file}")
+            else:
+                print(f"[HATA] Thumbnail indirilemedi: {response.status_code}")
         else:
-            print(f"[HATA] Thumbnail indirilemedi: {response.status_code}")
+            print(f"[INFO] Thumbnail zaten mevcut: {thumbnail_file}")
 
         #aciklama dosyasini guncelle
         description_file = os.path.join(dizin, "description.txt")
@@ -175,8 +178,9 @@ def process_and_download_playlist(playlist_url):
 
                 # Playlist isminin her kelimesini video başlığından çıkar
                 formatted_title = format_name(title)
+                playlist_title = playlist_title.split(" | ")[0].strip()
                 formatted_title = remove_playlist_words_from_title(formatted_title, playlist_title)
-
+                
                 if "  " in formatted_title:
                     # Parantez içindeki içeriği koru ve başlıktaki iki boşlukları temizle
                     match = re.search(r'\(.*?\)', formatted_title)  # Parantez içindeki içeriği bul
@@ -186,8 +190,7 @@ def process_and_download_playlist(playlist_url):
                     # Parantez içeriği varsa başlığa ekle
                     if parantez_icerik:
                         formatted_title = f"{formatted_title} {parantez_icerik.strip()}"
-
-                output_template = f"{klasor_name}/YT - {playlist_title}/items/%(upload_date>%Y.%m.%d)s - {formatted_title}.%(ext)s"
+                output_template = f"{klasor_name}/{kategori} - {playlist_title}/items/%(upload_date>%Y.%m.%d)s - {formatted_title}.%(ext)s"
                 #print(f"[DEBUG] Düzenlenmiş başlık: {formatted_title}")
 
                 # Videoyu indir
@@ -218,15 +221,36 @@ def process_and_download_playlist(playlist_url):
 # Ana işlemi başlat
 if __name__ == "__main__":
     print("[INFO] playlist.txt dosyası okunuyor...")
-    with open("playlists.txt", "r") as file:
-        playlists = [
-            line.split("#")[0].strip()  # # işaretinden sonra gelen kısmı yok say
-            for line in file if line.strip() and not line.startswith("#")
-        ]
+    
+    with open("playlists.txt", "r", encoding="utf-8") as file:
+        playlists = []  # Playlist linklerini ve kategorileri tutacak bir liste
 
-    for playlist_url in playlists:
+        for line in file:
+            # Satırı işlemek için temizle
+            stripped_line = line.strip()
+            
+            # Eğer satır boşsa veya '#' ile başlıyorsa atla
+            if not stripped_line or stripped_line.startswith("#"):
+                continue
+            
+            # Satırın baş kısmından linki, yıldız (*) ile işaretlenmiş kategori kısmını al
+            parts = stripped_line.split("*")
+            if len(parts) < 2:
+                continue  # Eğer format uygun değilse, o satırı atla
+            
+            link = parts[0].strip()  # Link kısmını al
+            category = parts[1].split("#")[0].strip()  # Kategori kısmını al ve yorumları çıkar (#'den sonrası)
+            
+            # Playlist linki ve kategoriyi tuple olarak kaydet
+            playlists.append((link, category))
+
+    # Elde edilen listeyi kontrol etmek için print edebilirsin
+    print(playlists)
+
+
+    for playlist_url, kategori in playlists:
         try:
-            process_and_download_playlist(playlist_url)
+            process_and_download_playlist(playlist_url, kategori)  # Kategori parametresi eklendi
         except Exception as e:
             print(f"[HATA] Playlist işlenirken bir hata oluştu: {playlist_url} - {e}")
             continue  # Hata olsa bile bir sonraki playlist'e geç
