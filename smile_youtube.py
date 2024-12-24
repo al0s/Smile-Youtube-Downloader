@@ -48,9 +48,9 @@ def Alower(data):
         result += lcase_char
     return result
 def Acapitalize(data):
-    if(data=="cc" or data=="Cc" or data=="CC"):
-        return "cc"
-    if(data[0] in ['(','"']):
+    if(data=="cc" or data=="Cc" or data=="CC" or data=="(cc)" or data=="(CC)"):
+        return "(cc)"
+    if(data[0] in ['(','"','’',"'"]):
         return data[0] + Aupper(data[1]) + Alower(data[2:])
     return Aupper(data[0]) + Alower(data[1:])
 def Atitle(data):
@@ -72,7 +72,7 @@ def format_name(name):
     name=name.replace(" l "," | ")
     name = remove_accent(name)
     #print(f"[DEBUG] format_name (accent sonrası): {name}") 
-    name = re.sub(r'[\/\'#!$%^.*?;:{}=_`~<>\\]', '', name)
+    name = re.sub(r"[\/\'#!$%^.*?;:{}=_`~<>\|\\]", '', name)
     #print(f"[DEBUG] format_name (resub sonrası): {name}") 
     name_lower = Alower(name)  # Lower işlemi
     #print(f"[DEBUG] format_name (lower sonrası): {name_lower}")
@@ -134,7 +134,7 @@ def process_and_download_playlist(playlist_url, kategori):
             return
 
         # Dosya ismini ve dizini ayarla
-        dizin = f"{klasor_name}/{kategori} - {playlist_title}/"
+        dizin = f"{klasor_name}/{kategori}/"
         os.makedirs(dizin, exist_ok=True)
         thumbnail_file = os.path.join(dizin, f"cover.jpg")
 
@@ -178,19 +178,19 @@ def process_and_download_playlist(playlist_url, kategori):
 
                 # Playlist isminin her kelimesini video başlığından çıkar
                 formatted_title = format_name(title)
-                playlist_title = playlist_title.split(" | ")[0].strip()
                 formatted_title = remove_playlist_words_from_title(formatted_title, playlist_title)
-                
                 if "  " in formatted_title:
                     # Parantez içindeki içeriği koru ve başlıktaki iki boşlukları temizle
                     match = re.search(r'\(.*?\)', formatted_title)  # Parantez içindeki içeriği bul
                     parantez_icerik = match.group(0) if match else ""  # Parantez içeriğini al
                     formatted_title = formatted_title.split("  ")[0].strip()  # İki boşluk sonrası temizle
-    
+                    
+                    
                     # Parantez içeriği varsa başlığa ekle
                     if parantez_icerik:
                         formatted_title = f"{formatted_title} {parantez_icerik.strip()}"
-                output_template = f"{klasor_name}/{kategori} - {playlist_title}/items/%(upload_date>%Y.%m.%d)s - {formatted_title}.%(ext)s"
+                output_template = f"{klasor_name}/{kategori}/items/%(upload_date>%Y.%m.%d)s - {formatted_title}.%(ext)s"
+                
                 #print(f"[DEBUG] Düzenlenmiş başlık: {formatted_title}")
 
                 # Videoyu indir
@@ -202,7 +202,10 @@ def process_and_download_playlist(playlist_url, kategori):
                             "-o", output_template,
                             "--embed-thumbnail",
                             "-x", 
-                            "--audio-format", "mp3", 
+                            "--audio-format", "mp3",
+                            "--add-metadata",  # Metadata ekle
+                            "--parse-metadata", "uploader:%(artist)s",
+                            "--postprocessor-args", "ffmpeg:-metadata title=",
                             f"https://www.youtube.com/watch?v={video_id}"
                         ],
                         check=True
@@ -235,17 +238,12 @@ if __name__ == "__main__":
             
             # Satırın baş kısmından linki, yıldız (*) ile işaretlenmiş kategori kısmını al
             parts = stripped_line.split("*")
-            if len(parts) < 2:
-                continue  # Eğer format uygun değilse, o satırı atla
             
-            link = parts[0].strip()  # Link kısmını al
-            category = parts[1].split("#")[0].strip()  # Kategori kısmını al ve yorumları çıkar (#'den sonrası)
+            link = parts[0]
+            category = parts[1]
             
             # Playlist linki ve kategoriyi tuple olarak kaydet
             playlists.append((link, category))
-
-    # Elde edilen listeyi kontrol etmek için print edebilirsin
-    print(playlists)
 
 
     for playlist_url, kategori in playlists:
