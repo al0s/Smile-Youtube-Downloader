@@ -72,7 +72,7 @@ def format_name(name):
     name=name.replace(" l "," | ")
     name = remove_accent(name)
     #print(f"[DEBUG] format_name (accent sonrası): {name}") 
-    name = re.sub(r"[\/\'#!$%^.*?;:{}=_`~<>\|\\]", '', name)
+    name = re.sub(r"[\/\'#“!”’$‘%^\]\[.*?…;:{}=_`~<>\|\\]", '', name)
     #print(f"[DEBUG] format_name (resub sonrası): {name}") 
     name_lower = Alower(name)  # Lower işlemi
     #print(f"[DEBUG] format_name (lower sonrası): {name_lower}")
@@ -152,11 +152,30 @@ def process_and_download_playlist(playlist_url, kategori):
         else:
             print(f"[INFO] Thumbnail zaten mevcut: {thumbnail_file}")
 
-        #aciklama dosyasini guncelle
-        description_file = os.path.join(dizin, "description.txt")
-        with open(description_file, "w", encoding="utf-8") as aciklama:
-            aciklama.write(description)
-            print(f"[INFO] Aciklama başarıyla guncellendi: {description}")
+        # details.json dosyasını güncelle
+        details_file = os.path.join(dizin, "details.json")
+        if not os.path.exists(details_file):
+            # Dosya yoksa oluştur ve description ekle
+            with open(details_file, "w", encoding="utf-8") as details:
+                json_data = {"description": description}
+                json.dump(json_data, details, indent=4, ensure_ascii=False)
+                print(f"[INFO] details.json başarıyla oluşturuldu ve description eklendi: {description}")
+        else:
+            # Dosya varsa mevcut description alanını güncelle
+            with open(details_file, "r", encoding="utf-8") as details:
+                try:
+                    json_data = json.load(details)
+                except json.JSONDecodeError:
+                    print("[ERROR] details.json okunamadı veya geçersiz bir JSON formatında.")
+                    json_data = {}
+
+            json_data["description"] = description
+
+            with open(details_file, "w", encoding="utf-8") as details:
+                json.dump(json_data, details, indent=4, ensure_ascii=False)
+                print(f"[INFO] details.json dosyasındaki description başarıyla güncellendi: {description}")
+
+
         dosya_adi = "zaten_indirilenler.md"
         satirlar = []
         dosya_yolu = os.path.join(dizin, dosya_adi)
@@ -168,9 +187,8 @@ def process_and_download_playlist(playlist_url, kategori):
             for entry in playlist_data.get("entries", []):
                 #input(entry)
                 video_id = entry.get("id")
-                if(any(video_id in satir for satir in satirlar)):
+                if video_id + "\n" in satirlar:
                     continue
-                
                 title = entry.get("title")
                 if not video_id or not title:
                     print(f"[HATA] Video bilgileri eksik, atlanıyor: {entry}")
@@ -179,11 +197,14 @@ def process_and_download_playlist(playlist_url, kategori):
                 # Playlist isminin her kelimesini video başlığından çıkar
                 formatted_title = format_name(title)
                 formatted_title = remove_playlist_words_from_title(formatted_title, playlist_title)
+                parantez_icerik = ""
                 if "  " in formatted_title:
                     # Parantez içindeki içeriği koru ve başlıktaki iki boşlukları temizle
                     match = re.search(r'\(.*?\)', formatted_title)  # Parantez içindeki içeriği bul
                     parantez_icerik = match.group(0) if match else ""  # Parantez içeriğini al
                     formatted_title = formatted_title.split("  ")[0].strip()  # İki boşluk sonrası temizle
+                if(formatted_title.endswith(" -")):
+                    formatted_title = formatted_title.replace(" -","") 
                     
                     
                     # Parantez içeriği varsa başlığa ekle
@@ -191,7 +212,7 @@ def process_and_download_playlist(playlist_url, kategori):
                         formatted_title = f"{formatted_title} {parantez_icerik.strip()}"
                 output_template = f"{klasor_name}/{kategori}/items/%(upload_date>%Y.%m.%d)s - {formatted_title}.%(ext)s"
                 
-                #print(f"[DEBUG] Düzenlenmiş başlık: {formatted_title}")
+                print(f"[DEBUG] Düzenlenmiş başlık: {formatted_title}")
 
                 # Videoyu indir
                 try:
