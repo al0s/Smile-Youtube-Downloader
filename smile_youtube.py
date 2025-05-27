@@ -99,6 +99,99 @@ subprocess.run(
             ])
 
 # Playlist bilgilerini işleyip indir
+
+def tip(url):
+    if "list=" in url and "playlist" in url:
+        return "playlist"
+    elif "list=" in url:
+        # list parametresi var ama playlist yoksa playlist olabilir (bazı watch URL'lerinde)
+        return "playlist"
+    elif "/channel/" in url or "/user/" in url or "/c/" in url:
+        return "channel"
+    else:
+        return "unknown"
+
+MIN_DURATION_SECONDS = 20 * 60  # 20 dakika
+
+def video_suresi_ve_id(video_url):
+    try:
+        result = subprocess.run(
+            ["yt-dlp", "--print", "%(duration)s %(id)s", video_url],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        output = result.stdout.strip()
+        duration_str, video_id = output.split()
+        return int(duration_str), video_id
+    except Exception as e:
+        print(f"[HATA] Süre alınamadı: {e}")
+        return None, None
+
+def process_and_download_channel(channel_url, kategori):
+    print(f"[INFO] Kanal videoları alınıyor: {channel_url} (Kategori: {kategori})")
+
+    dizin = f"{klasor_name}/{kategori}/"
+    os.makedirs(dizin, exist_ok=True)
+
+    dosya_adi = "zaten_indirilenler.md"
+    dosya_yolu = os.path.join(dizin, dosya_adi)
+
+    with open(dosya_yolu, "a+", encoding="utf-8") as dosya:
+        dosya.seek(0)
+        indirilenler = set([satir.strip() for satir in dosya.readlines()])
+
+    try:
+        # Kanal videolarının linklerini çek
+        result = subprocess.run(
+            ["yt-dlp", "--flat-playlist", "-J", channel_url],
+            check=True,
+            text=True,
+            capture_output=True
+        )
+
+
+        data = json.loads(result.stdout)
+        entries = data.get("entries", [])
+
+        for entry in entries:
+            video_id = entry.get("id")
+            if not video_id:
+                print("[UYARI] Video ID alınamadı, atlanıyor...")
+                continue
+
+            if video_id in indirilenler:
+                print(f"[INFO] Zaten indirilmiş, atlanıyor: {video_id}")
+                continue
+
+            video_url = f"https://www.youtube.com/watch?v={video_id}"
+            sure, video_id = video_suresi_ve_id(video_url)
+            if sure < MIN_DURATION_SECONDS:
+                continue
+            elif sure>= MIN_DURATION_SECONDS:
+                print(sure/60, "Dakikalik ses dosyasi indiriliyor!")
+            output_template = f"{dizin}/items/%(upload_date>%Y.%m.%d)s - %(title)s.%(ext)s"
+
+            print(f"[INFO] İndiriliyor: {video_url}")
+            subprocess.run([
+                "yt-dlp",
+                "-o", output_template,
+                "--extract-audio",
+                "--audio-format", "mp3",
+                "--embed-thumbnail",
+                "--add-metadata",
+                video_url
+            ])
+
+            with open(dosya_yolu, "a", encoding="utf-8") as dosya:
+                dosya.write(video_id + "\n")
+
+    except subprocess.CalledProcessError as e:
+        print(f"[HATA] Kanal verileri alınamadı: {channel_url}")
+        print(e.stderr)
+    except json.JSONDecodeError:
+        print("[HATA] JSON parse hatası.")
+
 def process_and_download_playlist(playlist_url, kategori):
     print(f"[INFO] Playlist bilgileri işleniyor: {playlist_url} (Kategori: {kategori})")
     try:
@@ -269,7 +362,12 @@ if __name__ == "__main__":
 
     for playlist_url, kategori in playlists:
         try:
-            process_and_download_playlist(playlist_url, kategori)  # Kategori parametresi eklendi
+            if(tip(playlist_url)=="playlist"):
+                process_and_download_playlist(playlist_url, kategori)  # Kategori parametresi eklendi
+            elif(tip(playlist_url)=="channel"):
+                process_and_download_channel(playlist_url, kategori)  # Kategori parametresi eklendi
+            else:
+                print("ERROR SORRY")
         except Exception as e:
             print(f"[HATA] Playlist işlenirken bir hata oluştu: {playlist_url} - {e}")
             continue  # Hata olsa bile bir sonraki playlist'e geç
