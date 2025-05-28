@@ -116,7 +116,7 @@ MIN_DURATION_SECONDS = 20 * 60  # 20 dakika
 def video_suresi_ve_id(video_url):
     try:
         result = subprocess.run(
-            ["yt-dlp", "--print", "%(duration)s %(id)s", video_url],
+            ["yt-dlp",  "--cookies","cookies.txt","--print", "%(duration)s %(id)s", video_url],
             capture_output=True,
             text=True,
             check=True
@@ -144,7 +144,7 @@ def process_and_download_channel(channel_url, kategori):
     try:
         # Kanal videolarının linklerini çek
         result = subprocess.run(
-            ["yt-dlp", "--flat-playlist", "-J", channel_url],
+            ["yt-dlp",  "--cookies","cookies.txt","--flat-playlist",  "--playlist-end", "20","-J", channel_url],
             check=True,
             text=True,
             capture_output=True
@@ -175,6 +175,7 @@ def process_and_download_channel(channel_url, kategori):
             print(f"[INFO] İndiriliyor: {video_url}")
             subprocess.run([
                 "yt-dlp",
+                "--cookies","cookies.txt",
                 "-o", output_template,
                 "--extract-audio",
                 "--audio-format", "mp3",
@@ -199,6 +200,7 @@ def process_and_download_playlist(playlist_url, kategori):
         result = subprocess.run(
             [
                 "yt-dlp", 
+                "--cookies","cookies.txt",
                 "--flat-playlist",
                 "-J", 
                 "--extractor-args", "youtube:lang=tr",
@@ -313,6 +315,7 @@ def process_and_download_playlist(playlist_url, kategori):
                     subprocess.run(
                         [
                             "yt-dlp",
+                            "--cookies","cookies.txt",
                             "-o", output_template,
                             "--embed-thumbnail",
                             "-x", 
