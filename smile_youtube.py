@@ -48,10 +48,6 @@ def Alower(data):
         result += lcase_char
     return result
 def Acapitalize(data):
-    if(data=="cc" or data=="Cc" or data=="CC" or data=="(cc)" or data=="(CC)"):
-        return "(cc)"
-    if(data[0] in ['(','"','’',"'"]):
-        return data[0] + Aupper(data[1]) + Alower(data[2:])
     return Aupper(data[0]) + Alower(data[1:])
 def Atitle(data):
     return " ".join(map(lambda x: Acapitalize(x), data.split()))
