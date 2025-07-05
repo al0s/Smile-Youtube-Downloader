@@ -6,6 +6,10 @@ import os
 import requests
 import argparse
 import sys
+import tempfile
+import shutil
+
+gecici_dizin = tempfile.mkdtemp()
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -166,19 +170,31 @@ def process_and_download_channel(channel_url, kategori):
                 continue
             elif sure>= MIN_DURATION_SECONDS:
                 print(sure/60, "Dakikalik ses dosyasi indiriliyor!")
-            output_template = f"{dizin}/items/%(upload_date>%Y.%m.%d)s - %(title)s.%(ext)s"
-
-            print(f"[INFO] İndiriliyor: {video_url}")
+            #output_template = f"{dizin}/items/%(upload_date>%Y.%m.%d)s - %(title)s.%(ext)s"
+            # Geçici dizine indir
+            temp_output = os.path.join(gecici_dizin, "%(upload_date>%Y.%m.%d)s - %(title)s.%(ext)s")
+            print(f"[INFO] Geçici dizine indiriliyor: {video_url}")
             subprocess.run([
                 "yt-dlp",
                 "--cookies","cookies.txt",
-                "-o", output_template,
+                "-o", temp_output,
                 "--extract-audio",
                 "--audio-format", "mp3",
                 "--embed-thumbnail",
                 "--add-metadata",
                 video_url
             ])
+
+            # Dosyayı geçici dizinden hedef dizine taşı
+            hedef_klasor = os.path.join(dizin, "items")
+            os.makedirs(hedef_klasor, exist_ok=True)
+
+            for dosya_adi in os.listdir(gecici_dizin):
+                if dosya_adi.endswith(".mp3"):
+                    kaynak = os.path.join(gecici_dizin, dosya_adi)
+                    hedef = os.path.join(hedef_klasor, dosya_adi)
+                    print(f"[INFO] Taşınıyor: {hedef}")
+                    shutil.move(kaynak, hedef)
 
             with open(dosya_yolu, "a", encoding="utf-8") as dosya:
                 dosya.write(video_id + "\n")
@@ -301,9 +317,12 @@ def process_and_download_playlist(playlist_url, kategori):
                     # Parantez içeriği varsa başlığa ekle
                     if parantez_icerik:
                         formatted_title = f"{formatted_title} {parantez_icerik.strip()}"
-                output_template = f"{klasor_name}/{kategori}/items/%(upload_date>%Y.%m.%d)s - {formatted_title}.%(ext)s"
+                #output_template = f"{klasor_name}/{kategori}/items/%(upload_date>%Y.%m.%d)s - {formatted_title}.%(ext)s"
                 
                 print(f"[DEBUG] Düzenlenmiş başlık: {formatted_title}")
+                
+                # 2. Geçici dizin oluştur
+                gecici_output_template = os.path.join(gecici_dizin, f"%(upload_date>%Y.%m.%d)s - {formatted_title}.%(ext)s")
 
                 # Videoyu indir
                 try:
@@ -312,7 +331,7 @@ def process_and_download_playlist(playlist_url, kategori):
                         [
                             "yt-dlp",
                             "--cookies","cookies.txt",
-                            "-o", output_template,
+                            "-o", gecici_output_template,
                             "--embed-thumbnail",
                             "-x", 
                             "--audio-format", "mp3",
@@ -323,6 +342,19 @@ def process_and_download_playlist(playlist_url, kategori):
                         ],
                         check=True
                     )
+
+                    # Hedef klasörü oluştur
+                    hedef_klasor = os.path.join(klasor_name, kategori, "items")
+                    os.makedirs(hedef_klasor, exist_ok=True)
+
+                    # Geçici klasördeki tek dosyayı bul ve taşı
+                    for dosya_adi in os.listdir(gecici_dizin):
+                        if dosya_adi.endswith(".mp3"):
+                            kaynak = os.path.join(gecici_dizin, dosya_adi)
+                            hedef = os.path.join(hedef_klasor, dosya_adi)
+                            print(f"[INFO] Taşınıyor: {hedef}")
+                            shutil.move(kaynak, hedef)
+
                     dosya.write(video_id+"\n")
                     dosya.flush()
                 except subprocess.CalledProcessError as e:
@@ -372,4 +404,5 @@ if __name__ == "__main__":
             continue  # Hata olsa bile bir sonraki playlist'e geç
 
     print("[INFO] Tüm playlistler işlendi!")
-    input("Cikmak icin bir tusa basin...")
+    input("Cikmak ve gecici dizini silmek icin bir tusa basin...")
+    shutil.rmtree(gecici_dizin, ignore_errors=True)
