@@ -106,12 +106,12 @@ def tip(url):
     elif "list=" in url:
         # list parametresi var ama playlist yoksa playlist olabilir (bazı watch URL'lerinde)
         return "playlist"
-    elif "/channel/" in url or "/user/" in url or "/c/" in url:
+    elif "/channel/" in url or "/user/" in url or "/c/" in url or "/videos" in url or "/streams" in url:
         return "channel"
     else:
         return "unknown"
 
-MIN_DURATION_SECONDS = 20 * 60  # 20 dakika
+MIN_DURATION_SECONDS = 2 * 60  # 2 dakika
 
 def video_suresi_ve_id(video_url):
     try:
