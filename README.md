@@ -49,15 +49,24 @@ python smile_youtube.py --channel-limit 10
 python smile_youtube.py --gui
 ```
 
+Migration from old CLI
+```bash
+# Migrate old playlists.txt to playlist.json and exit
+python smile_youtube.py --migrate
+```
+
 Input Sources
 - GUI: Uses `playlist.json` automatically (created/updated on run).
-- CLI: Reads `playlists.txt` lines in format: `URL*Kategori`
+- CLI: Reads `playlists.txt` lines in format: `URL *Kategori` (asterisk öncesi boşluk var, sonrası yok)
+# Example line (replace with any public playlist URL):
+`https://www.youtube.com/playlist?list=PLAYLIST_ID *Kitaplar`
 
 Output Structure
-- Playlists: saved under `Klasor/Kategori - Playlist Ismi/items/*.mp3`
-- Channels: saved under `Klasor/Kategori/items/*.mp3`
-- Per-playlist folder includes `cover.jpg` and `details.json` (description)
-- Downloaded video IDs tracked in `zaten_indirilenler.md`
+- Simple mode: only mp3 files in playlist/channel folder, plus `zaten_indirilenler.md`
+- Normal mode:
+  - Playlists: saved under `Klasor/Kategori - Playlist Ismi/items/*.mp3`
+  - Channels: saved under `Klasor/Kategori/items/*.mp3`
+  - Per-playlist folder includes `cover.jpg` and `details.json` (description)
 
 Notes
 - Logs stream to both console and the GUI log panel.

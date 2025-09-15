@@ -28,6 +28,7 @@ parser.add_argument("--minutes", type=int, default=None, help="Kanal videoları 
 parser.add_argument("--gui", action="store_true", help="Basit GUI ile çalıştır.")
 parser.add_argument("--channel-limit", type=int, default=None, help="Kanal için en son kaç video indirilecek (opsiyonel).")
 parser.add_argument("--simple", action="store_true", help="Sade indirme modu: sadece MP3 ve zaten_indirilenler.md")
+parser.add_argument("--migrate", action="store_true", help="playlists.txt dosyasını playlist.json'a dönüştür ve çık")
 args = parser.parse_args()
 klasor_name=args.klasor
 
@@ -451,10 +452,10 @@ def parse_playlists_text(text):
             continue
         parts = stripped_line.split("*")
         if len(parts) < 2:
-            print(f"[UYARI] Satır atlandı, format beklenen gibi değil (url*Kategori): {stripped_line}")
+            print(f"[UYARI] Satır atlandı, format beklenen gibi değil (URL *Kategori): {stripped_line}")
             continue
-        link = parts[0]
-        category = parts[1]
+        link = parts[0].strip()
+        category = parts[1].strip()
         playlists.append((link, category))
     return playlists
 
@@ -574,6 +575,39 @@ def launch_gui():
         rows_vars.append((link_var, kat_var, isim_var, frm, num_lbl))
 
     tk.Button(root, text="Ekle", command=lambda: add_row()).grid(row=0, column=1, padx=8, pady=(8,2), sticky="w")
+    def import_from_txt():
+        path = filedialog.askopenfilename(title="playlists.txt seç", filetypes=[("Text", "*.txt"), ("All", "*.*")])
+        if not path:
+            # fallback to default if exists
+            default_path = os.path.join(os.getcwd(), "playlists.txt")
+            if os.path.exists(default_path):
+                path = default_path
+            else:
+                messagebox.showwarning("Uyarı", "Dosya seçilmedi ve 'playlists.txt' bulunamadı.")
+                return
+        try:
+            tuples = parse_playlists_file(path)
+            if not tuples:
+                messagebox.showinfo("Bilgi", "İçe aktarılacak satır bulunamadı.")
+                return
+            for link, kat in tuples:
+                add_row(link, kat, "")
+            # Save all rows to playlist.json
+            try:
+                entries = []
+                for (link_var, kat_var, isim_var, _frm, _lbl) in list(rows_vars):
+                    link = link_var.get().strip()
+                    kat = kat_var.get().strip()
+                    isim = isim_var.get().strip()
+                    if link and kat:
+                        entries.append({"link": link, "kategori": kat, "playlist_ismi": isim})
+                save_playlists_json(entries)
+            except Exception as e:
+                log(f"[HATA] playlist.json kaydedilemedi: {e}")
+            messagebox.showinfo("İçe Aktarıldı", f"{len(tuples)} satır eklendi ve playlist.json güncellendi.")
+        except Exception as e:
+            messagebox.showerror("Hata", str(e))
+    tk.Button(root, text="İçe aktar (playlists.txt)", command=import_from_txt).grid(row=0, column=2, padx=8, pady=(8,2), sticky="w")
 
     # Load from playlist.json
     existing = load_playlists_json()
@@ -718,6 +752,20 @@ if __name__ == "__main__":
         CHANNEL_MAX_VIDEOS = max(1, args.channel_limit)
     if args.simple:
         SIMPLE_MODE = True
+    if args.migrate:
+        # Convert playlists.txt -> playlist.json and exit
+        try:
+            if not os.path.exists("playlists.txt"):
+                log("[MIGRATE] playlists.txt bulunamadı.")
+            else:
+                items = []
+                for link, kat in parse_playlists_file("playlists.txt"):
+                    items.append({"link": link, "kategori": kat, "playlist_ismi": ""})
+                save_playlists_json(items)
+                log("[MIGRATE] playlist.json oluşturuldu/güncellendi.")
+        except Exception as e:
+            log(f"[MIGRATE] Hata: {e}")
+        sys.exit(0)
 
     if args.gui:
         launch_gui()
