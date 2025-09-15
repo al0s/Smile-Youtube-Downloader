@@ -28,6 +28,7 @@ parser.add_argument("--minutes", type=int, default=None, help="Kanal videoları 
 parser.add_argument("--gui", action="store_true", help="Basit GUI ile çalıştır.")
 parser.add_argument("--channel-limit", type=int, default=None, help="Kanal için en son kaç video indirilecek (opsiyonel).")
 parser.add_argument("--simple", action="store_true", help="Sade indirme modu: sadece MP3 ve zaten_indirilenler.md")
+parser.add_argument("--no-name-change", action="store_true", help="Video isimlerini değiştirme, orijinal isimleri kullan")
 parser.add_argument("--migrate", action="store_true", help="playlists.txt dosyasını playlist.json'a dönüştür ve çık")
 args = parser.parse_args()
 klasor_name=args.klasor
@@ -97,6 +98,37 @@ def remove_playlist_words_from_title(formatted_title, playlist_title):
         #print(f"[DEBUG] Dikkat araform: {formatted_title}")
 
     #print(f"[DEBUG] remove_playlist_words_from_title sonrası: {formatted_title}")  # Debug: Başlık sonrası
+    return formatted_title
+
+# Video başlığını temizleyen fonksiyon - kanal ismi, gereksiz kelimeler ve başlangıç sayılarını çıkarır
+def clean_video_title(formatted_title, original_title=None):
+    # Başlıktaki fazla boşlukları temizle
+    formatted_title = re.sub(r'\s+', ' ', formatted_title).strip()
+    
+    # Başlığın başındaki sayıları ve tire işaretlerini çıkar (örn: "8 - " veya "21. SÖZ")
+    formatted_title = re.sub(r'^\d+\.?\s*-\s*', '', formatted_title)
+    formatted_title = re.sub(r'^\d+\.?\s+', '', formatted_title)
+    
+    # Yaygın kanal ismi kalıplarını çıkar
+    # "EMİNE EROĞLU İLE" gibi kalıpları çıkar
+    formatted_title = re.sub(r'^[A-ZÇĞIİÖŞÜ\s]+İLE\s+', '', formatted_title, flags=re.IGNORECASE)
+    formatted_title = re.sub(r'^[A-ZÇĞIİÖŞÜ\s]+LE\s+', '', formatted_title, flags=re.IGNORECASE)
+    
+    # Başlığın başındaki gereksiz kelimeleri çıkar
+    # "EMİNE EROĞLU" gibi isimleri çıkar (2-3 kelimelik isim kalıpları)
+    formatted_title = re.sub(r'^[A-ZÇĞIİÖŞÜ]{2,}\s+[A-ZÇĞIİÖŞÜ]{2,}(\s+[A-ZÇĞIİÖŞÜ]{2,})?\s+', '', formatted_title)
+    
+    # Tekrar fazla boşlukları temizle
+    formatted_title = re.sub(r'\s+', ' ', formatted_title).strip()
+    
+    # Eğer başlık çok kısa kaldıysa (sadece "-" veya boş), orijinal başlığı kullan
+    if not formatted_title or formatted_title in ['-', ''] or len(formatted_title.strip()) < 3:
+        if original_title:
+            # Orijinal başlığı kullan ama sadece dosya adı için güvenli hale getir
+            return re.sub(r'[<>:"/\\|?*]', '', original_title)
+        else:
+            return formatted_title
+    
     return formatted_title
 
 #Update YT-DLP
@@ -192,6 +224,9 @@ def wait_if_paused(context_tag=None):
 
 # Simple mode: only MP3 and already-downloaded list, no cover/details
 SIMPLE_MODE = False
+
+# Video name change option: whether to format video names or keep original
+CHANGE_VIDEO_NAME = True
 
 def video_suresi_ve_id(video_url):
     try:
@@ -380,22 +415,32 @@ def process_and_download_playlist(playlist_url, kategori, playlist_ismi=None, co
                     print(f"[HATA] Video bilgileri eksik, atlanıyor: {entry}")
                     continue
 
-                # Playlist isminin her kelimesini video başlığından çıkar
-                formatted_title = format_name(title)
-                formatted_title = remove_playlist_words_from_title(formatted_title, playlist_title)
-                parantez_icerik = ""
-                if "  " in formatted_title:
-                    # Parantez içindeki içeriği koru ve başlıktaki iki boşlukları temizle
-                    match = re.search(r'\(.*?\)', formatted_title)  # Parantez içindeki içeriği bul
-                    parantez_icerik = match.group(0) if match else ""  # Parantez içeriğini al
-                    formatted_title = formatted_title.split("  ")[0].strip()  # İki boşluk sonrası temizle
-                if(formatted_title.endswith(" -")):
-                    formatted_title = formatted_title.replace(" -","") 
+                # Video ismini değiştirme seçeneğine göre başlığı işle
+                if CHANGE_VIDEO_NAME:
+                    # Playlist isminin her kelimesini video başlığından çıkar
+                    formatted_title = format_name(title)
+                    formatted_title = remove_playlist_words_from_title(formatted_title, playlist_title)
                     
+                    # Video başlığını temizle (kanal ismi, gereksiz kelimeler, başlangıç sayıları)
+                    # Orijinal başlığı da geç ki çok kısa kalırsa orijinali kullansın
+                    formatted_title = clean_video_title(formatted_title, title)
                     
-                    # Parantez içeriği varsa başlığa ekle
-                    if parantez_icerik:
-                        formatted_title = f"{formatted_title} {parantez_icerik.strip()}"
+                    parantez_icerik = ""
+                    if "  " in formatted_title:
+                        # Parantez içindeki içeriği koru ve başlıktaki iki boşlukları temizle
+                        match = re.search(r'\(.*?\)', formatted_title)  # Parantez içindeki içeriği bul
+                        parantez_icerik = match.group(0) if match else ""  # Parantez içeriğini al
+                        formatted_title = formatted_title.split("  ")[0].strip()  # İki boşluk sonrası temizle
+                    if(formatted_title.endswith(" -")):
+                        formatted_title = formatted_title.replace(" -","") 
+                        
+                        
+                        # Parantez içeriği varsa başlığa ekle
+                        if parantez_icerik:
+                            formatted_title = f"{formatted_title} {parantez_icerik.strip()}"
+                else:
+                    # Orijinal başlığı kullan, sadece dosya adı için güvenli hale getir
+                    formatted_title = re.sub(r'[<>:"/\\|?*]', '', title)
                 #output_template = f"{klasor_name}/{kategori}/items/%(upload_date>%Y.%m.%d)s - {formatted_title}.%(ext)s"
                 
                 log(f"{tag}[DEBUG] Düzenlenmiş başlık: {formatted_title}")
@@ -670,6 +715,45 @@ def launch_gui():
     # Simple mode checkbox
     simple_mode_var = tk.BooleanVar(value=False)
     tk.Checkbutton(root, text="Sade indirme (sadece MP3)", variable=simple_mode_var).grid(row=4, column=0, columnspan=2, sticky="w", padx=8)
+    
+    # Video name change checkbox
+    change_name_var = tk.BooleanVar(value=True)
+    tk.Checkbutton(root, text="Video ismini değiştir", variable=change_name_var).grid(row=4, column=2, columnspan=2, sticky="w", padx=8)
+    
+    # Guide button
+    def show_guide():
+        guide_text = """
+Smile YouTube Downloader Kullanım Kılavuzu
+
+1. PLAYLIST EKLEME:
+   - "Ekle" butonuna tıklayarak yeni satır ekleyin
+   - Link: YouTube playlist veya kanal URL'si
+   - Kategori: Dosyaların kaydedileceği ana klasör adı
+   - Playlist Ismi: Opsiyonel, alt klasör adı
+
+2. AYARLAR:
+   - Klasör: İndirilen dosyaların kaydedileceği ana dizin
+   - Minimum dakika: Kanal videoları için en az süre (dakika)
+   - Kanal: son kaç video: Kanal videolarından kaç tanesi indirilecek
+   - Sade indirme: Sadece MP3 dosyaları ve zaten_indirilenler.md
+   - Video ismini değiştir: Video başlıklarını düzenle (Türkçe karakterler, büyük/küçük harf)
+
+3. KONTROLLER:
+   - Başlat: İndirme işlemini başlatır
+   - Duraklat: Her video arasında duraklatma modunu açar/kapatır
+   - Devam: Duraklatılmış işlemi devam ettirir
+
+4. DOSYA YÖNETİMİ:
+   - İçe aktar: playlists.txt dosyasından playlist'leri yükler
+   - JSON'a kaydet: Mevcut ayarları playlist.json'a kaydeder
+
+5. DESTEK:
+   - Log alanında işlem durumunu takip edebilirsiniz
+   - Hata durumunda log mesajlarını kontrol edin
+        """
+        messagebox.showinfo("Kullanım Kılavuzu", guide_text)
+    
+    tk.Button(root, text="Kılavuz", command=show_guide).grid(row=4, column=3, padx=8, pady=4, sticky="e")
 
     status_var = tk.StringVar(value="Hazır")
     status_lbl = tk.Label(root, textvariable=status_var)
@@ -723,11 +807,13 @@ def launch_gui():
             global klasor_name
             global MIN_DURATION_SECONDS
             global SIMPLE_MODE
+            global CHANGE_VIDEO_NAME
             klasor_name = folder
             MIN_DURATION_SECONDS = max(0, mins) * 60
             global CHANNEL_MAX_VIDEOS
             CHANNEL_MAX_VIDEOS = max(1, ch_limit)
             SIMPLE_MODE = bool(simple_mode_var.get())
+            CHANGE_VIDEO_NAME = bool(change_name_var.get())
             status_var.set("İndirme başladı...")
             try:
                 # Save JSON snapshot
@@ -779,6 +865,8 @@ if __name__ == "__main__":
         CHANNEL_MAX_VIDEOS = max(1, args.channel_limit)
     if args.simple:
         SIMPLE_MODE = True
+    if args.no_name_change:
+        CHANGE_VIDEO_NAME = False
     if args.migrate:
         # Convert playlists.txt -> playlist.json and exit
         try:
