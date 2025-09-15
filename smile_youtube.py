@@ -27,6 +27,7 @@ parser.add_argument("--klasor", type=str, default="./Podcasts", help="İndirilec
 parser.add_argument("--minutes", type=int, default=None, help="Kanal videoları için minimum dakika (opsiyonel).")
 parser.add_argument("--gui", action="store_true", help="Basit GUI ile çalıştır.")
 parser.add_argument("--channel-limit", type=int, default=None, help="Kanal için en son kaç video indirilecek (opsiyonel).")
+parser.add_argument("--simple", action="store_true", help="Sade indirme modu: sadece MP3 ve zaten_indirilenler.md")
 args = parser.parse_args()
 klasor_name=args.klasor
 
@@ -188,6 +189,9 @@ def wait_if_paused(context_tag=None):
         except Exception:
             pass
 
+# Simple mode: only MP3 and already-downloaded list, no cover/details
+SIMPLE_MODE = False
+
 def video_suresi_ve_id(video_url):
     try:
         result = subprocess.run(
@@ -264,7 +268,7 @@ def process_and_download_channel(channel_url, kategori, context_tag=None):
             wait_if_paused()
 
             # Dosyayı geçici dizinden hedef dizine taşı
-            hedef_klasor = os.path.join(dizin, "items")
+            hedef_klasor = dizin if SIMPLE_MODE else os.path.join(dizin, "items")
             os.makedirs(hedef_klasor, exist_ok=True)
 
             for dosya_adi in os.listdir(gecici_dizin):
@@ -308,16 +312,16 @@ def process_and_download_playlist(playlist_url, kategori, playlist_ismi=None, co
         playlist_title=format_name(title)
         thumbnails = playlist_data.get("thumbnails", [])
         description = playlist_data.get("description", None)
-        if not thumbnails:
-            log(f"{tag}[HATA] Playlist için thumbnail bilgisi bulunamadı.")
-            return
-
-        # En büyük ID'ye sahip thumbnail'i bul
-        largest_thumbnail = max(thumbnails, key=lambda x: int(x.get("id", 0)))
-        thumbnail_url = largest_thumbnail.get("url", None)
-        if not thumbnail_url:
-            log(f"{tag}[HATA] Thumbnail URL bulunamadı.")
-            return
+        thumbnail_url = None
+        if not SIMPLE_MODE:
+            if not thumbnails:
+                log(f"{tag}[HATA] Playlist için thumbnail bilgisi bulunamadı.")
+                return
+            largest_thumbnail = max(thumbnails, key=lambda x: int(x.get("id", 0)))
+            thumbnail_url = largest_thumbnail.get("url", None)
+            if not thumbnail_url:
+                log(f"{tag}[HATA] Thumbnail URL bulunamadı.")
+                return
 
         # Dosya ismini ve dizini ayarla
         if playlist_ismi:
@@ -329,30 +333,30 @@ def process_and_download_playlist(playlist_url, kategori, playlist_ismi=None, co
         thumbnail_file = os.path.join(dizin, f"cover.jpg")
 
         # Thumbnail dosyasını indir
-        if not os.path.exists(thumbnail_file):
-            log(f"{tag}[INFO] Thumbnail indiriliyor: {thumbnail_url}")
-            response = requests.get(thumbnail_url, stream=True)
-            if response.status_code == 200:
-                with open(thumbnail_file, "wb") as file:
-                    for chunk in response.iter_content(1024):
-                        file.write(chunk)
-                log(f"{tag}[INFO] Thumbnail başarıyla indirildi: {thumbnail_file}")
+        if not SIMPLE_MODE and thumbnail_url:
+            if not os.path.exists(thumbnail_file):
+                log(f"{tag}[INFO] Thumbnail indiriliyor: {thumbnail_url}")
+                response = requests.get(thumbnail_url, stream=True)
+                if response.status_code == 200:
+                    with open(thumbnail_file, "wb") as file:
+                        for chunk in response.iter_content(1024):
+                            file.write(chunk)
+                    log(f"{tag}[INFO] Thumbnail başarıyla indirildi: {thumbnail_file}")
+                else:
+                    log(f"{tag}[HATA] Thumbnail indirilemedi: {response.status_code}")
             else:
-                log(f"{tag}[HATA] Thumbnail indirilemedi: {response.status_code}")
-        else:
-            log(f"{tag}[INFO] Thumbnail zaten mevcut: {thumbnail_file}")
+                log(f"{tag}[INFO] Thumbnail zaten mevcut: {thumbnail_file}")
 
         # details.json dosyasını güncelle
-        details_file = os.path.join(dizin, "details.json")
-        if not os.path.exists(details_file):
-            # Dosya yoksa oluştur ve description ekle
-            with open(details_file, "w", encoding="utf-8") as details:
-                json_data = {"description": description}
-                json.dump(json_data, details, indent=4, ensure_ascii=False)
-                log(f"{tag}[INFO] details.json başarıyla oluşturuldu ve description eklendi: {description}")
-        else:
-            log(f"{tag}[INFO] details.json dosyası zaten mevcut.")
-            pass
+        if not SIMPLE_MODE:
+            details_file = os.path.join(dizin, "details.json")
+            if not os.path.exists(details_file):
+                with open(details_file, "w", encoding="utf-8") as details:
+                    json_data = {"description": description}
+                    json.dump(json_data, details, indent=4, ensure_ascii=False)
+                    log(f"{tag}[INFO] details.json başarıyla oluşturuldu ve description eklendi: {description}")
+            else:
+                log(f"{tag}[INFO] details.json dosyası zaten mevcut.")
 
 
         dosya_adi = "zaten_indirilenler.md"
@@ -417,7 +421,7 @@ def process_and_download_playlist(playlist_url, kategori, playlist_ismi=None, co
                     wait_if_paused(context_tag)
 
                     # Hedef klasörü oluştur
-                    hedef_klasor = os.path.join(dizin, "items")
+                    hedef_klasor = dizin if SIMPLE_MODE else os.path.join(dizin, "items")
                     os.makedirs(hedef_klasor, exist_ok=True)
 
                     # Geçici klasördeki tek dosyayı bul ve taşı
@@ -530,7 +534,7 @@ def launch_gui():
             pass
     # Reserve vertical stretch to log area row
     try:
-        root.grid_rowconfigure(7, weight=1)
+        root.grid_rowconfigure(8, weight=1)
     except Exception:
         pass
 
@@ -602,14 +606,18 @@ def launch_gui():
     channel_limit_entry = tk.Entry(root, textvariable=channel_limit_var, width=8)
     channel_limit_entry.grid(row=3, column=3, padx=4, pady=4, sticky="w")
 
+    # Simple mode checkbox
+    simple_mode_var = tk.BooleanVar(value=False)
+    tk.Checkbutton(root, text="Sade indirme (sadece MP3)", variable=simple_mode_var).grid(row=4, column=0, columnspan=2, sticky="w", padx=8)
+
     status_var = tk.StringVar(value="Hazır")
     status_lbl = tk.Label(root, textvariable=status_var)
-    status_lbl.grid(row=4, column=0, columnspan=4, sticky="we", padx=8, pady=(0,8))
+    status_lbl.grid(row=5, column=0, columnspan=4, sticky="we", padx=8, pady=(0,8))
 
     # Log area
-    tk.Label(root, text="Log").grid(row=6, column=0, sticky="w", padx=8)
+    tk.Label(root, text="Log").grid(row=7, column=0, sticky="w", padx=8)
     log_frame = tk.Frame(root)
-    log_frame.grid(row=7, column=0, columnspan=4, padx=8, pady=(0,8), sticky="nsew")
+    log_frame.grid(row=8, column=0, columnspan=4, padx=8, pady=(0,8), sticky="nsew")
     try:
         log_frame.grid_rowconfigure(0, weight=1)
         log_frame.grid_columnconfigure(0, weight=1)
@@ -653,10 +661,12 @@ def launch_gui():
         def worker():
             global klasor_name
             global MIN_DURATION_SECONDS
+            global SIMPLE_MODE
             klasor_name = folder
             MIN_DURATION_SECONDS = max(0, mins) * 60
             global CHANNEL_MAX_VIDEOS
             CHANNEL_MAX_VIDEOS = max(1, ch_limit)
+            SIMPLE_MODE = bool(simple_mode_var.get())
             status_var.set("İndirme başladı...")
             try:
                 # Save JSON snapshot
@@ -691,7 +701,7 @@ def launch_gui():
             pass
 
     control_frame = tk.Frame(root)
-    control_frame.grid(row=5, column=0, columnspan=4, padx=8, pady=(0,10), sticky="w")
+    control_frame.grid(row=6, column=0, columnspan=4, padx=8, pady=(0,10), sticky="w")
     tk.Button(control_frame, text="Başlat", command=start_download).grid(row=0, column=0, padx=(0,8))
     pause_btn = tk.Button(control_frame, text="Duraklat: Kapalı", command=toggle_pause)
     pause_btn.grid(row=0, column=1, padx=(0,8))
@@ -706,6 +716,8 @@ if __name__ == "__main__":
         MIN_DURATION_SECONDS = max(0, args.minutes) * 60
     if args.channel_limit is not None:
         CHANNEL_MAX_VIDEOS = max(1, args.channel_limit)
+    if args.simple:
+        SIMPLE_MODE = True
 
     if args.gui:
         launch_gui()
