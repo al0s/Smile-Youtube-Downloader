@@ -208,11 +208,13 @@ def video_suresi_ve_id(video_url):
         print(f"[HATA] Süre alınamadı: {e}")
         return None, None
 
-def process_and_download_channel(channel_url, kategori, context_tag=None):
+def process_and_download_channel(channel_url, kategori, playlist_ismi=None, context_tag=None):
     tag = f"[{context_tag}] " if context_tag else ""
-    log(f"{tag}[INFO] Kanal videoları alınıyor (Kategori: {kategori})")
+    log(f"{tag}[INFO] Kanal videoları alınıyor (Kategori: {kategori}{' - ' + playlist_ismi if playlist_ismi else ''})")
 
-    dizin = f"{klasor_name}/{kategori}/"
+    # Klasör adı: Kategori - Playlist Ismi (varsa)
+    dizin_adi = f"{kategori} - {playlist_ismi}" if playlist_ismi else f"{kategori}"
+    dizin = os.path.join(klasor_name, dizin_adi)
     os.makedirs(dizin, exist_ok=True)
 
     dosya_adi = "zaten_indirilenler.md"
@@ -265,8 +267,6 @@ def process_and_download_channel(channel_url, kategori, context_tag=None):
                 "--add-metadata",
                 video_url
             ])
-            # pause after each video
-            wait_if_paused()
 
             # Dosyayı geçici dizinden hedef dizine taşı
             hedef_klasor = dizin if SIMPLE_MODE else os.path.join(dizin, "items")
@@ -281,6 +281,9 @@ def process_and_download_channel(channel_url, kategori, context_tag=None):
 
             with open(dosya_yolu, "a", encoding="utf-8") as dosya:
                 dosya.write(video_id + "\n")
+
+            # pause after successful move and record
+            wait_if_paused(context_tag)
 
     except subprocess.CalledProcessError as e:
         log(f"{tag}[HATA] Kanal verileri alınamadı")
@@ -324,11 +327,10 @@ def process_and_download_playlist(playlist_url, kategori, playlist_ismi=None, co
                 log(f"{tag}[HATA] Thumbnail URL bulunamadı.")
                 return
 
-        # Dosya ismini ve dizini ayarla
-        if playlist_ismi:
-            dizin_adi = f"{kategori} - {playlist_ismi}"
-        else:
-            dizin_adi = f"{kategori}"
+        # Dosya ismini ve dizini ayarla (daima Kategori - Playlist Ismi)
+        # playlist_ismi yoksa API'den gelen playlist başlığını kullan
+        computed_name = playlist_ismi if playlist_ismi else playlist_title
+        dizin_adi = f"{kategori} - {computed_name}"
         dizin = os.path.join(klasor_name, dizin_adi)
         os.makedirs(dizin, exist_ok=True)
         thumbnail_file = os.path.join(dizin, f"cover.jpg")
@@ -418,8 +420,6 @@ def process_and_download_playlist(playlist_url, kategori, playlist_ismi=None, co
                             f"https://www.youtube.com/watch?v={video_id}"
                         ]
                     )
-                    # pause after each video
-                    wait_if_paused(context_tag)
 
                     # Hedef klasörü oluştur
                     hedef_klasor = dizin if SIMPLE_MODE else os.path.join(dizin, "items")
@@ -435,6 +435,9 @@ def process_and_download_playlist(playlist_url, kategori, playlist_ismi=None, co
 
                     dosya.write(video_id+"\n")
                     dosya.flush()
+
+                    # pause after successful move and record
+                    wait_if_paused(context_tag)
                 except subprocess.CalledProcessError as e:
                     log(f"{tag}[HATA] Video indirilemedi: {formatted_title} - {e}")
                     continue  # Hata olsa bile bir sonraki videoya geç
@@ -452,11 +455,21 @@ def parse_playlists_text(text):
             continue
         parts = stripped_line.split("*")
         if len(parts) < 2:
-            print(f"[UYARI] Satır atlandı, format beklenen gibi değil (URL *Kategori): {stripped_line}")
+            print(f"[UYARI] Satır atlandı, format beklenen gibi değil (URL *Kategori [- Playlist Ismi]): {stripped_line}")
             continue
         link = parts[0].strip()
-        category = parts[1].strip()
-        playlists.append((link, category))
+        right = parts[1].strip()
+        playlist_name = ""
+        if " - " in right:
+            category, playlist_name = right.split(" - ", 1)
+            category = category.strip()
+            playlist_name = playlist_name.strip()
+        else:
+            category = right
+        if playlist_name:
+            playlists.append((link, category, playlist_name))
+        else:
+            playlists.append((link, category))
     return playlists
 
 def parse_playlists_file(path):
@@ -504,7 +517,7 @@ def process_playlists(playlists):
             if(tip(playlist_url)=="playlist"):
                 process_and_download_playlist(playlist_url, kategori, playlist_ismi, context_tag=context_tag)
             elif(tip(playlist_url)=="channel"):
-                process_and_download_channel(playlist_url, kategori, context_tag=context_tag)
+                process_and_download_channel(playlist_url, kategori, playlist_ismi, context_tag=context_tag)
             else:
                 log(f"[{context_tag}] [HATA] Tanınmayan link tipi, atlanıyor")
         except Exception as e:
@@ -608,6 +621,20 @@ def launch_gui():
         except Exception as e:
             messagebox.showerror("Hata", str(e))
     tk.Button(root, text="İçe aktar (playlists.txt)", command=import_from_txt).grid(row=0, column=2, padx=8, pady=(8,2), sticky="w")
+    def save_to_json():
+        try:
+            entries = []
+            for (link_var, kat_var, isim_var, _frm, _lbl) in list(rows_vars):
+                link = link_var.get().strip()
+                kat = kat_var.get().strip()
+                isim = isim_var.get().strip()
+                if link and kat:
+                    entries.append({"link": link, "kategori": kat, "playlist_ismi": isim})
+            save_playlists_json(entries)
+            messagebox.showinfo("Kaydedildi", f"playlist.json güncellendi ({len(entries)} satır).")
+        except Exception as e:
+            messagebox.showerror("Hata", str(e))
+    tk.Button(root, text="JSON'a kaydet", command=save_to_json).grid(row=0, column=3, padx=8, pady=(8,2), sticky="w")
 
     # Load from playlist.json
     existing = load_playlists_json()
@@ -759,8 +786,13 @@ if __name__ == "__main__":
                 log("[MIGRATE] playlists.txt bulunamadı.")
             else:
                 items = []
-                for link, kat in parse_playlists_file("playlists.txt"):
-                    items.append({"link": link, "kategori": kat, "playlist_ismi": ""})
+                for parsed in parse_playlists_file("playlists.txt"):
+                    if isinstance(parsed, (list, tuple)) and len(parsed) >= 3:
+                        link, kat, isim = parsed[0], parsed[1], parsed[2]
+                    else:
+                        link, kat = parsed[0], parsed[1]
+                        isim = ""
+                    items.append({"link": link, "kategori": kat, "playlist_ismi": isim})
                 save_playlists_json(items)
                 log("[MIGRATE] playlist.json oluşturuldu/güncellendi.")
         except Exception as e:
