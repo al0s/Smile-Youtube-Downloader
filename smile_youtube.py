@@ -10,7 +10,18 @@ import tempfile
 import shutil
 import threading
 import pathlib
+import platform
 from typing import Optional
+
+if platform.system() == "Windows":
+    base_path = os.path.dirname(sys.executable)
+    ffmpeg_path = os.path.join(base_path, "ffmpeg.exe")
+    ffprobe_path = os.path.join(base_path, "ffprobe.exe")
+    yt_dlp_path = os.path.join(base_path, "yt-dlp.exe")
+else:  # Linux / macOS
+    ffmpeg_path = "ffmpeg"   # PATH’ten alır
+    ffprobe_path = "ffprobe"
+    yt_dlp_path = "yt-dlp"   # PATH’ten veya script klasöründen
 
 gecici_dizin = tempfile.mkdtemp()
 
