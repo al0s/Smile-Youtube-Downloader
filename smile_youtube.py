@@ -268,19 +268,8 @@ def process_and_download_playlist(playlist_url, kategori):
                 json.dump(json_data, details, indent=4, ensure_ascii=False)
                 print(f"[INFO] details.json başarıyla oluşturuldu ve description eklendi: {description}")
         else:
-            # Dosya varsa mevcut description alanını güncelle
-            with open(details_file, "r", encoding="utf-8") as details:
-                try:
-                    json_data = json.load(details)
-                except json.JSONDecodeError:
-                    print("[ERROR] details.json okunamadı veya geçersiz bir JSON formatında.")
-                    json_data = {}
-
-            json_data["description"] = description
-
-            with open(details_file, "w", encoding="utf-8") as details:
-                json.dump(json_data, details, indent=4, ensure_ascii=False)
-                print(f"[INFO] details.json dosyasındaki description başarıyla güncellendi: {description}")
+            print(f"[INFO] details.json dosyası zaten mevcut.")
+            pass
 
 
         dosya_adi = "zaten_indirilenler.md"
