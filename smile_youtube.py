@@ -292,6 +292,7 @@ def process_and_download_channel(channel_url, kategori, playlist_ismi=None, cont
 
         for entry in entries:
             video_id = entry.get("id")
+            video_title = entry.get("title")
             if not video_id:
                 log(f"{tag}[UYARI] Video ID alınamadı, atlanıyor...")
                 continue
@@ -308,7 +309,11 @@ def process_and_download_channel(channel_url, kategori, playlist_ismi=None, cont
                 log(f"{tag}" + str(sure/60) + " Dakikalik ses dosyasi indiriliyor!")
             #output_template = f"{dizin}/items/%(upload_date>%Y.%m.%d)s - %(title)s.%(ext)s"
             # Geçici dizine indir
-            temp_output = os.path.join(gecici_dizin, "%(upload_date>%Y.%m.%d)s - %(title)s.%(ext)s")
+                formatted_title = format_name(video_title)
+                log(f"{tag}[DEBUG] Düzenlenmiş başlık: {formatted_title}")
+                
+            temp_output = os.path.join(gecici_dizin, f"%(upload_date>%Y.%m.%d)s - {formatted_title}.%(ext)s")
+
             log(f"{tag}[INFO] Geçici dizine indiriliyor")
             run_streaming_subprocess([
                 "yt-dlp",
