@@ -72,7 +72,10 @@ def Alower(data):
         result += lcase_char
     return result
 def Acapitalize(data):
-    return Aupper(data[0]) + Alower(data[1:])
+    if len(data) > 2 and (data[0] == '"' or data[0] == "'"):
+        return data[0] + Aupper(data[1]) + Alower(data[2:])
+    else:
+        return Aupper(data[0]) + Alower(data[1:])
 def Atitle(data):
     return " ".join(map(lambda x: Acapitalize(x), data.split()))
 
@@ -88,45 +91,49 @@ def remove_accent(name):
 
 #gereksiz karakterleri silip, sapkalari kaldiriyor ve kelimelerin ilk harflerini buyuk yapiyor.
 def format_name(name):
-    #print(f"[DEBUG] format_name (lower öncesi): {name}")
+    name=name.replace("''", '"')
     name=name.replace(" l "," | ")
     name = remove_accent(name)
-    #print(f"[DEBUG] format_name (accent sonrası): {name}") 
     name = re.sub(r"[\/\'#“!”’$‘%^\]\[.*?…;:{}=_`~<>\|\\]", '', name)
-    #print(f"[DEBUG] format_name (resub sonrası): {name}") 
     name_lower = Alower(name)  # Lower işlemi
-    #print(f"[DEBUG] format_name (lower sonrası): {name_lower}")
     return ' '.join(Acapitalize(word) for word in name_lower.split())
 
+placeholders = {}
+def protect_quotes(match):
+    key = f"__QUOTE_{len(placeholders)}__"
+    placeholders[key] = match.group(0)
+    return key
+
 # Playlist başlığındaki her kelimeyi video başlığından çıkaran fonksiyon
-def remove_playlist_words_from_title(formatted_title, playlist_title):
-    #print(f"[DEBUG] remove_playlist_words_from_title öncesi: {formatted_title}")  # Debug: Başlık önce
-    # Playlist isminin her kelimesini video başlığından çıkar
+def remove_playlist_words_from_title(video_title, playlist_title):
+    protected_title = re.sub(r'"[^"]*"', protect_quotes, video_title)
+
+    # Playlist kelimelerini çıkar
     playlist_words = playlist_title.split()
     for word in playlist_words:
-        word = remove_accent(word)  # Şapkalı harfleri düzleştir
-        formatted_title = re.sub(r'\b' + re.escape(word) + r'\b', '', formatted_title, flags=re.IGNORECASE).strip()
-        #print(f"[DEBUG] Dikkat araform: {formatted_title}")
+        word_clean = remove_accent(word)
+        protected_title = re.sub(r'\b' + re.escape(word_clean) + r'\b', '', protected_title, flags=re.IGNORECASE).strip()
 
-    #print(f"[DEBUG] remove_playlist_words_from_title sonrası: {formatted_title}")  # Debug: Başlık sonrası
-    return formatted_title
+    # Placeholder'ları geri koy
+    for key, original in placeholders.items():
+        protected_title = protected_title.replace(key, original)
+    return protected_title
+
 
 # Video başlığını temizleyen fonksiyon - kanal ismi, gereksiz kelimeler ve başlangıç sayılarını çıkarır
 def clean_video_title(formatted_title, original_title=None):
     # Başlıktaki fazla boşlukları temizle
     formatted_title = re.sub(r'\s+', ' ', formatted_title).strip()
     
-    # Başlığın başındaki sayıları ve tire işaretlerini çıkar (örn: "8 - " veya "21. SÖZ")
+    # Başlığın başındaki sayıları ve tire işaretlerini çıkar (örn: "8 - " veya "21. YUZYIL")
     formatted_title = re.sub(r'^\d+\.?\s*-\s*', '', formatted_title)
     formatted_title = re.sub(r'^\d+\.?\s+', '', formatted_title)
     
     # Yaygın kanal ismi kalıplarını çıkar
-    # "EMİNE EROĞLU İLE" gibi kalıpları çıkar
     formatted_title = re.sub(r'^[A-ZÇĞIİÖŞÜ\s]+İLE\s+', '', formatted_title, flags=re.IGNORECASE)
     formatted_title = re.sub(r'^[A-ZÇĞIİÖŞÜ\s]+LE\s+', '', formatted_title, flags=re.IGNORECASE)
     
     # Başlığın başındaki gereksiz kelimeleri çıkar
-    # "EMİNE EROĞLU" gibi isimleri çıkar (2-3 kelimelik isim kalıpları)
     formatted_title = re.sub(r'^[A-ZÇĞIİÖŞÜ]{2,}\s+[A-ZÇĞIİÖŞÜ]{2,}(\s+[A-ZÇĞIİÖŞÜ]{2,})?\s+', '', formatted_title)
     
     # Tekrar fazla boşlukları temizle
@@ -139,7 +146,7 @@ def clean_video_title(formatted_title, original_title=None):
             return re.sub(r'[<>:"/\\|?*]', '', original_title)
         else:
             return formatted_title
-    
+    formatted_title=formatted_title.replace('"',"'")
     return formatted_title
 
 #Update YT-DLP
@@ -436,19 +443,6 @@ def process_and_download_playlist(playlist_url, kategori, playlist_ismi=None, co
                     # Orijinal başlığı da geç ki çok kısa kalırsa orijinali kullansın
                     formatted_title = clean_video_title(formatted_title, title)
                     
-                    parantez_icerik = ""
-                    if "  " in formatted_title:
-                        # Parantez içindeki içeriği koru ve başlıktaki iki boşlukları temizle
-                        match = re.search(r'\(.*?\)', formatted_title)  # Parantez içindeki içeriği bul
-                        parantez_icerik = match.group(0) if match else ""  # Parantez içeriğini al
-                        formatted_title = formatted_title.split("  ")[0].strip()  # İki boşluk sonrası temizle
-                    if(formatted_title.endswith(" -")):
-                        formatted_title = formatted_title.replace(" -","") 
-                        
-                        
-                        # Parantez içeriği varsa başlığa ekle
-                        if parantez_icerik:
-                            formatted_title = f"{formatted_title} {parantez_icerik.strip()}"
                 else:
                     # Orijinal başlığı kullan, sadece dosya adı için güvenli hale getir
                     formatted_title = re.sub(r'[<>:"/\\|?*]', '', title)
@@ -728,7 +722,7 @@ def launch_gui():
     tk.Checkbutton(root, text="Sade indirme (sadece MP3)", variable=simple_mode_var).grid(row=4, column=0, columnspan=2, sticky="w", padx=8)
     
     # Video name change checkbox
-    change_name_var = tk.BooleanVar(value=True)
+    change_name_var = tk.BooleanVar(value=False)
     tk.Checkbutton(root, text="Video ismini değiştir", variable=change_name_var).grid(row=4, column=2, columnspan=2, sticky="w", padx=8)
     
     # Guide button
