@@ -259,7 +259,7 @@ def video_suresi_ve_id(video_url):
         return int(duration_str), video_id
     except Exception as e:
         print(f"[HATA] Süre alınamadı: {e}")
-        return None, None
+        return 0, 0
 
 def process_and_download_channel(channel_url, kategori, playlist_ismi=None, context_tag=None):
     tag = f"[{context_tag}] " if context_tag else ""
