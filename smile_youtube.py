@@ -147,6 +147,7 @@ def clean_video_title(formatted_title, original_title=None):
         else:
             return formatted_title
     formatted_title=formatted_title.replace('"',"'")
+    formatted_title=formatted_title.replace(" 4k","")
     return formatted_title
 
 #Update YT-DLP
@@ -592,19 +593,13 @@ def launch_gui():
     global gui_root, gui_log_widget
     gui_root = root
 
-    try:
-        root.resizable(True, True)
-    except Exception:
-        pass
-    for col in range(4):
-        try:
-            root.grid_columnconfigure(col, weight=1)
-        except Exception:
-            pass
-    try:
-        root.grid_rowconfigure(8, weight=1)
-    except Exception:
-        pass
+    root.resizable(True, True)
+
+    for col in range(2):
+        root.grid_columnconfigure(col, weight=1, uniform="equal")  # uniform ile her sütunu eşit yapıyoruz
+
+    for row in range(10):  # Satır sayısı arttıkça büyütmek gerekebilir
+        root.grid_rowconfigure(row, weight=1)
 
     # Başlık
     tk.Label(root, text="Playlistler").grid(row=0, column=0, sticky="w", padx=8, pady=(8, 2))
@@ -644,7 +639,7 @@ def launch_gui():
         num_lbl.grid(row=0, column=0, sticky="w", padx=(0,6))
 
         tk.Label(frm, text="Link:").grid(row=0, column=1, sticky="w")
-        tk.Entry(frm, textvariable=link_var, width=40).grid(row=0, column=2, padx=4)
+        tk.Entry(frm, textvariable=link_var, width=50).grid(row=0, column=2, padx=4)
 
         tk.Label(frm, text="Kategori:").grid(row=0, column=3, sticky="w")
         tk.Entry(frm, textvariable=kat_var, width=20).grid(row=0, column=4, padx=4)
@@ -653,8 +648,6 @@ def launch_gui():
         tk.Entry(frm, textvariable=isim_var, width=25).grid(row=0, column=6, padx=4)
 
         rows_vars.append((link_var, kat_var, isim_var, frm, num_lbl))
-
-
 
 
         def remove_this():
@@ -668,7 +661,6 @@ def launch_gui():
             except:
                 pass
         tk.Button(frm, text="Sil", command=remove_this).grid(row=0, column=7, padx=4)
-        rows_vars.append((link_var, kat_var, isim_var, frm, num_lbl))
 
     tk.Button(root, text="Ekle", command=lambda: add_row()).grid(row=0, column=1, padx=8, pady=(8,2), sticky="w")
     def import_from_txt():
