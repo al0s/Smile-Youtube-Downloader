@@ -591,7 +591,7 @@ def launch_gui():
     root.title("Smile YouTube Downloader")
     global gui_root, gui_log_widget
     gui_root = root
-    # Make window resizable and content scalable
+
     try:
         root.resizable(True, True)
     except Exception:
@@ -601,34 +601,62 @@ def launch_gui():
             root.grid_columnconfigure(col, weight=1)
         except Exception:
             pass
-    # Reserve vertical stretch to log area row
     try:
         root.grid_rowconfigure(8, weight=1)
     except Exception:
         pass
 
-    # Rows: Link, Kategori, Playlist Ismi
+    # Başlık
     tk.Label(root, text="Playlistler").grid(row=0, column=0, sticky="w", padx=8, pady=(8, 2))
 
-    rows_frame = tk.Frame(root)
-    rows_frame.grid(row=1, column=0, columnspan=4, padx=8, pady=(0, 8), sticky="nsew")
+    # --- Scrollbar için Canvas + Frame yapısı ---
+    container = tk.Frame(root)
+    container.grid(row=1, column=0, columnspan=4, sticky="nsew", padx=8, pady=(0, 8))
+
+    canvas = tk.Canvas(container)
+    canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+    scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    scrollable_frame = tk.Frame(canvas)
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+
+    def on_configure(event):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    scrollable_frame.bind("<Configure>", on_configure)
+    canvas.configure(yscrollcommand=scrollbar.set)
+    # -------------------------------------------------
+
     rows_vars = []  # list of (link_var, kategori_var, isim_var, frame, num_label)
 
     def add_row(default_link="", default_kategori="", default_isim=""):
         link_var = tk.StringVar(value=default_link)
         kat_var = tk.StringVar(value=default_kategori)
         isim_var = tk.StringVar(value=default_isim)
+
         row = len(rows_vars) + 1
-        frm = tk.Frame(rows_frame)
+        frm = tk.Frame(scrollable_frame)
         frm.grid(row=row, column=0, sticky="we", pady=2)
-        num_lbl = tk.Label(frm, text=f"P{len(rows_vars)+1}")
+
+        num_lbl = tk.Label(frm, text=f"P{row}")
         num_lbl.grid(row=0, column=0, sticky="w", padx=(0,6))
+
         tk.Label(frm, text="Link:").grid(row=0, column=1, sticky="w")
         tk.Entry(frm, textvariable=link_var, width=40).grid(row=0, column=2, padx=4)
+
         tk.Label(frm, text="Kategori:").grid(row=0, column=3, sticky="w")
         tk.Entry(frm, textvariable=kat_var, width=20).grid(row=0, column=4, padx=4)
+
         tk.Label(frm, text="Playlist Ismi:").grid(row=0, column=5, sticky="w")
         tk.Entry(frm, textvariable=isim_var, width=25).grid(row=0, column=6, padx=4)
+
+        rows_vars.append((link_var, kat_var, isim_var, frm, num_lbl))
+
+
+
+
         def remove_this():
             try:
                 rows_vars.remove((link_var, kat_var, isim_var, frm, num_lbl))
