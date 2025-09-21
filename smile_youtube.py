@@ -202,6 +202,7 @@ def run_streaming_subprocess(cmd: list[str], cwd: Optional[str]=None) -> int:
         return_code = process.wait()
         if return_code != 0:
             log(f"[HATA] Komut başarısız: {cmd} -> {return_code}")
+            return -1
         return return_code
     except Exception as e:
         log(f"[HATA] Komut çalıştırılamadı: {cmd} -> {e}")
@@ -316,7 +317,7 @@ def process_and_download_channel(channel_url, kategori, playlist_ismi=None, cont
             temp_output = os.path.join(gecici_dizin, f"%(upload_date>%Y.%m.%d)s - {formatted_title}.%(ext)s")
 
             log(f"{tag}[INFO] Geçici dizine indiriliyor")
-            run_streaming_subprocess([
+            result = run_streaming_subprocess([
                 "yt-dlp",
                 "--cookies","cookies.txt",
                 "-o", temp_output,
@@ -326,6 +327,9 @@ def process_and_download_channel(channel_url, kategori, playlist_ismi=None, cont
                 "--add-metadata",
                 video_url
             ])
+            
+            if(result == -1):
+                continue
 
             # Dosyayı geçici dizinden hedef dizine taşı
             hedef_klasor = dizin if SIMPLE_MODE else os.path.join(dizin, "items")
@@ -462,7 +466,7 @@ def process_and_download_playlist(playlist_url, kategori, playlist_ismi=None, co
                 # Videoyu indir
                 try:
                     log(f"{tag}[INFO] Video indiriliyor: {formatted_title}")
-                    run_streaming_subprocess(
+                    result = run_streaming_subprocess(
                         [
                             "yt-dlp",
                             "--cookies","cookies.txt",
@@ -476,6 +480,9 @@ def process_and_download_playlist(playlist_url, kategori, playlist_ismi=None, co
                             f"https://www.youtube.com/watch?v={video_id}"
                         ]
                     )
+
+                    if(result == -1):
+                        continue
 
                     # Hedef klasörü oluştur
                     hedef_klasor = dizin if SIMPLE_MODE else os.path.join(dizin, "items")
