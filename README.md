@@ -51,13 +51,13 @@ python smile_youtube.py --gui
 
 Migration from old CLI
 ```bash
-# Migrate old playlists.txt to playlist.json and exit
+# Migrate old playlist.txt to playlist.json and exit
 python smile_youtube.py --migrate
 ```
 
 Input Sources
 - GUI: Uses `playlist.json` automatically (created/updated on run).
-- CLI: Reads `playlists.txt` lines in format: `URL *Kategori` (asterisk öncesi boşluk var, sonrası yok)
+- CLI: Reads `playlist.txt` lines in format: `URL *Kategori` (asterisk öncesi boşluk var, sonrası yok)
 # Example line (replace with any public playlist URL):
 `https://www.youtube.com/playlist?list=PLAYLIST_ID *Kitaplar`
 

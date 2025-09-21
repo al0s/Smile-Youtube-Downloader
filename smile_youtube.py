@@ -40,7 +40,7 @@ parser.add_argument("--gui", action="store_true", help="Basit GUI ile çalışt�
 parser.add_argument("--channel-limit", type=int, default=None, help="Kanal için en son kaç video indirilecek (opsiyonel).")
 parser.add_argument("--simple", action="store_true", help="Sade indirme modu: sadece MP3 ve zaten_indirilenler.md")
 parser.add_argument("--no-name-change", action="store_true", help="Video isimlerini değiştirme, orijinal isimleri kullan")
-parser.add_argument("--migrate", action="store_true", help="playlists.txt dosyasını playlist.json'a dönüştür ve çık")
+parser.add_argument("--migrate", action="store_true", help="playlist.txt dosyasını playlist.json'a dönüştür ve çık")
 args = parser.parse_args()
 klasor_name=args.klasor
 
@@ -672,14 +672,14 @@ def launch_gui():
 
     tk.Button(root, text="Ekle", command=lambda: add_row()).grid(row=0, column=1, padx=8, pady=(8,2), sticky="w")
     def import_from_txt():
-        path = filedialog.askopenfilename(title="playlists.txt seç", filetypes=[("Text", "*.txt"), ("All", "*.*")])
+        path = filedialog.askopenfilename(title="playlist.txt seç", filetypes=[("Text", "*.txt"), ("All", "*.*")])
         if not path:
             # fallback to default if exists
-            default_path = os.path.join(os.getcwd(), "playlists.txt")
+            default_path = os.path.join(os.getcwd(), "playlist.txt")
             if os.path.exists(default_path):
                 path = default_path
             else:
-                messagebox.showwarning("Uyarı", "Dosya seçilmedi ve 'playlists.txt' bulunamadı.")
+                messagebox.showwarning("Uyarı", "Dosya seçilmedi ve 'playlist.txt' bulunamadı.")
                 return
         try:
             tuples = parse_playlists_file(path)
@@ -703,7 +703,7 @@ def launch_gui():
             messagebox.showinfo("İçe Aktarıldı", f"{len(tuples)} satır eklendi ve playlist.json güncellendi.")
         except Exception as e:
             messagebox.showerror("Hata", str(e))
-    tk.Button(root, text="İçe aktar (playlists.txt)", command=import_from_txt).grid(row=0, column=2, padx=8, pady=(8,2), sticky="w")
+    tk.Button(root, text="İçe aktar (playlist.txt)", command=import_from_txt).grid(row=0, column=2, padx=8, pady=(8,2), sticky="w")
     def save_to_json():
         try:
             entries = []
@@ -782,7 +782,7 @@ Smile YouTube Downloader Kullanım Kılavuzu
    - Devam: Duraklatılmış işlemi devam ettirir
 
 4. DOSYA YÖNETİMİ:
-   - İçe aktar: playlists.txt dosyasından playlist'leri yükler
+   - İçe aktar: playlist.txt dosyasından playlist'leri yükler
    - JSON'a kaydet: Mevcut ayarları playlist.json'a kaydeder
 
 5. DESTEK:
@@ -906,13 +906,13 @@ if __name__ == "__main__":
     if args.no_name_change:
         CHANGE_VIDEO_NAME = False
     if args.migrate:
-        # Convert playlists.txt -> playlist.json and exit
+        # Convert playlist.txt -> playlist.json and exit
         try:
-            if not os.path.exists("playlists.txt"):
-                log("[MIGRATE] playlists.txt bulunamadı.")
+            if not os.path.exists("playlist.txt"):
+                log("[MIGRATE] playlist.txt bulunamadı.")
             else:
                 items = []
-                for parsed in parse_playlists_file("playlists.txt"):
+                for parsed in parse_playlists_file("playlist.txt"):
                     if isinstance(parsed, (list, tuple)) and len(parsed) >= 3:
                         link, kat, isim = parsed[0], parsed[1], parsed[2]
                     else:
@@ -929,7 +929,7 @@ if __name__ == "__main__":
         launch_gui()
     else:
         log("[INFO] playlist.txt dosyası okunuyor...")
-        playlists = parse_playlists_file("playlists.txt")
+        playlists = parse_playlists_file("playlist.txt")
         process_playlists(playlists)
         log("[INFO] Tüm playlistler işlendi!")
         input("Cikmak ve gecici dizini silmek icin bir tusa basin...")
