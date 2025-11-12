@@ -131,7 +131,6 @@ def clean_video_title(formatted_title, original_title=None):
     
     # Yaygın kanal ismi kalıplarını çıkar
     formatted_title = re.sub(r'^[A-ZÇĞIİÖŞÜ\s]+İLE\s+', '', formatted_title, flags=re.IGNORECASE)
-    formatted_title = re.sub(r'^[A-ZÇĞIİÖŞÜ\s]+LE\s+', '', formatted_title, flags=re.IGNORECASE)
     
     # Başlığın başındaki gereksiz kelimeleri çıkar
     formatted_title = re.sub(r'^[A-ZÇĞIİÖŞÜ]{2,}\s+[A-ZÇĞIİÖŞÜ]{2,}(\s+[A-ZÇĞIİÖŞÜ]{2,})?\s+', '', formatted_title)
