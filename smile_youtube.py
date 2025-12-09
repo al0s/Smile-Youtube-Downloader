@@ -72,7 +72,7 @@ def Alower(data):
         result += lcase_char
     return result
 def Acapitalize(data):
-    if len(data) > 2 and (data[0] == '"' or data[0] == "'"):
+    if len(data) > 2 and (data[0] == '"' or data[0] == "'" or data[0] == "("):
         return data[0] + Aupper(data[1]) + Alower(data[2:])
     else:
         return Aupper(data[0]) + Alower(data[1:])
@@ -94,7 +94,7 @@ def format_name(name):
     name=name.replace("''", '"')
     name=name.replace(" l "," | ")
     name = remove_accent(name)
-    name = re.sub(r"[\/\'#“!”’$‘%^\]\[.*?…;:{}=_`~<>\|\\]", '', name)
+    name = re.sub(r"[\/#“!”’$‘%^\]\[*?…;:{}=_`~<>\|\\]", '', name)
     name_lower = Alower(name)  # Lower işlemi
     return ' '.join(Acapitalize(word) for word in name_lower.split())
 
@@ -127,7 +127,7 @@ def clean_video_title(formatted_title, original_title=None):
     
     # Başlığın başındaki sayıları ve tire işaretlerini çıkar (örn: "8 - " veya "21. YUZYIL")
     formatted_title = re.sub(r'^\d+\.?\s*-\s*', '', formatted_title)
-    formatted_title = re.sub(r'^\d+\.?\s+', '', formatted_title)
+    #formatted_title = re.sub(r'^\d+\.?\s+', '', formatted_title)
     
     # Yaygın kanal ismi kalıplarını çıkar
     formatted_title = re.sub(r'^[A-ZÇĞIİÖŞÜ\s]+İLE\s+', '', formatted_title, flags=re.IGNORECASE)
